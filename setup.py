@@ -13,6 +13,7 @@ setup(
     install_requires=[
         "sasl",
         "thrift",
+        "tornado",
     ],
     test_suite='pyhs2.test',
     tests_require=["mock"]
