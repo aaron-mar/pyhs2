@@ -96,8 +96,6 @@ class Connection(BaseConnection):
         self.client.CloseSession(req)
 
 class TornadoConnection(BaseConnection):
-    _cursor = None
-
     def __init__(self, host=None, port=10000, authMechanism=None, user=None, password=None, configuration=None):
         super(TornadoConnection, self).__init__(authMechanism)
         #Must set a password for thrift, even if it doesn't need one
@@ -124,14 +122,10 @@ class TornadoConnection(BaseConnection):
 
     @gen.engine
     def close(self, callback):
-        if self._cursor is not None:
-            yield gen.Task(self._cursor.close)
         req = TCloseSessionReqTornado(sessionHandle=self.session)
         yield gen.Task(self.client.CloseSession, req)
         self.transport.close()
         callback()
 
     def cursor(self):
-        if self._cursor is None:
-            self._cursor = TornadoCursor(self.client, self.session)
-        return self._cursor
+        return TornadoCursor(self.client, self.session)
