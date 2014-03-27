@@ -89,12 +89,6 @@ class TornadoCursor(object):
         fetch_res = yield gen.Task(self.fetch)
         callback(fetch_res)
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, _exc_type, _exc_value, _traceback):
-        yield gen.Task(self.close)
-
     @gen.engine
     def _fetch(self, rows, fetchReq, callback):
         while True:

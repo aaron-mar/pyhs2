@@ -14,6 +14,7 @@ from cursor import Cursor
 from TCLIService.ttypes import TCloseSessionReq, TOpenSessionReq
 from TCLIServiceTornado.ttypes import TCloseSessionReq as TCloseSessionReqTornado, \
     TOpenSessionReq as TOpenSessionReqTornado
+from pyhs2.cloudera.thrift_sasl_tornado import TSaslClientTransportTornado
 from pyhs2.cursor_tornado import TornadoCursor
 
 
@@ -95,24 +96,18 @@ class Connection(BaseConnection):
         self.client.CloseSession(req)
 
 class TornadoConnection(BaseConnection):
-    def __enter__(self):
-        return self
-
-    def __exit__(self, _exc_type, _exc_value, _traceback):
-        yield gen.Task(self.close)
+    _cursor = None
 
     def __init__(self, host=None, port=10000, authMechanism=None, user=None, password=None, configuration=None):
         super(TornadoConnection, self).__init__(authMechanism)
         #Must set a password for thrift, even if it doesn't need one
         #Open issue with python-sasl
         password = self._check_password(authMechanism, password)
-        socket = TSocket(host, port)
-        if authMechanism == 'NOSASL':
-            self.transport = TTornadoStreamTransport(socket.host, socket.port)
+        if authMechanism == "NOSASL":
+            self.transport = TTornadoStreamTransport(host, port)
         else:
             saslc, sasl_mech = self._get_sasl_client(host, authMechanism, user, password, configuration)
-            # TODO: I think we have to update this transport so it's non-blocking!!!
-            self.transport = TSaslClientTransport(saslc, sasl_mech, socket)
+            self.transport = TSaslClientTransportTornado(saslc, sasl_mech, host, port)
         pfactory = TBinaryProtocolFactory()
         self.client = TCLIServiceTornado.Client(self.transport, pfactory)
 
@@ -123,16 +118,20 @@ class TornadoConnection(BaseConnection):
         res = yield gen.Task(self.client.OpenSession, req)
         self.session = res.sessionHandle
         if database is not None:
-            with self.cursor() as cur:
-                query = "USE {0}".format(database)
-                yield gen.Task(cur.execute, query)
+            query = "USE {0}".format(database)
+            yield gen.Task(self.cursor().execute, query)
         callback()
 
     @gen.engine
     def close(self, callback):
+        if self._cursor is not None:
+            yield gen.Task(self._cursor.close)
         req = TCloseSessionReqTornado(sessionHandle=self.session)
         yield gen.Task(self.client.CloseSession, req)
+        self.transport.close()
         callback()
 
     def cursor(self):
-        return TornadoCursor(self.client, self.session)
+        if self._cursor is None:
+            self._cursor = TornadoCursor(self.client, self.session)
+        return self._cursor
