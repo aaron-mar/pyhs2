@@ -5,7 +5,7 @@ setup(
     version='0.4.1',
     author='Brad Ruderman',
     author_email='bradruderman@gmail.com',
-    packages=['pyhs2', 'pyhs2/cloudera', 'pyhs2/TCLIService'],
+    packages=['pyhs2', 'pyhs2/cloudera', 'pyhs2/TCLIService', 'pyhs2/TCLIServiceTornado'],
     url='https://github.com/BradRuderman/pyhs2',
     license='LICENSE.txt',
     description='Python Hive Server 2 Client Driver',
